@@ -1,0 +1,11 @@
+data/
+derivatives/
+staging/
+__pycache__/
+
+*.log
+
+APEX_EEG_Processor.py
+John questions.txt
+model_builders.py
+train.py

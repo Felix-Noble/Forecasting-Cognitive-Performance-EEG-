@@ -1,0 +1,13 @@
+tensorflow==2.10
+numpy==1.26
+keras-tuner==1.4.7
+scikit-learn==1.7.0
+mne==1.9.0
+mne-bids==0.16.0
+pybv>=0.7.3
+defusedxml
+scipy
+toml
+pandas
+nolds
+psutil
