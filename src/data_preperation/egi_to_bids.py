@@ -1,25 +1,28 @@
-from config import get_paths, get_cut_settings 
-import mne, os, glob, sys
+from src.utils.config_loader import get_paths, get_settings_prep 
+from src.utils.make_loggers import make_logger
+import mne
+import os
 from mne_bids import BIDSPath, write_raw_bids
 from pathlib import Path
 mne.set_log_level("WARNING")
 
-def main():
-    
+def _process():
+    """Project specific function to move egi dataset to bids format"""
     paths = get_paths()
     files = Path(paths["input_dir"]).rglob("*.mff")
     files_subjects = [(f,f.stem) for f in files]
 
-    cut_settings = get_cut_settings()
+    logger = make_logger(Path(__file__).stem)
+    prep_settings = get_settings_prep()
 
     for (file, subject) in files_subjects:
         
         try:
             raw = mne.io.read_raw_egi(file, preload=False)
             last_time = (raw.n_times-1)/raw.info['sfreq'] # last timestamp = n. samples / sample frequency
-            first_time = last_time - cut_settings["t_minus_end"]
-            print(f"Processing {file}")
-            print(f"First time: {first_time} last time {last_time}")
+            first_time = last_time - prep_settings["t_minus_end"]
+            logger.info(f"Processing {file}")
+            logger.info(f"First time: {first_time} last time {last_time}")
             if first_time > 0:
                 raw = raw.crop(tmin=first_time, tmax=last_time)
 
@@ -47,12 +50,10 @@ def main():
             os.makedirs(Path(paths["output_dir"]) / f"sub-{subject_id}" / f"ses-{session_id}", exist_ok=True)
             
             write_raw_bids(raw, bids_path, overwrite=True)
-            print(f"Subject: {subject_id} saved to {bids_path}")
+            logger.info(f"Subject: {subject_id} saved to {bids_path}")
 
         except Exception as e:
-            print(e)
+            logger.error(f"sub-{subject} {e}")
 
-        
-        
 if __name__ == "__main__":
-    main()
+    _process()

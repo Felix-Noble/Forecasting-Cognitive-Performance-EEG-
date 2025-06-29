@@ -9,3 +9,8 @@ APEX_EEG_Processor.py
 John questions.txt
 model_builders.py
 train.py
+
+test/
+test_dir/
+aptima_analysis.egg-info/
+

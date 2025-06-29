@@ -2,107 +2,96 @@
 import numpy as np
 from numpy.random import choice
 import time
-import glob
 from pathlib import Path
 
-# def within_subject_load_npy(trial_filepaths, n_timepoints, time_idx, indexes,channel, 
-#                             lock, delay=0.1):
-#     out = np.zeros((n_timepoints,1))
-    
-#     for i in time_idx:
-#         lock.aquire()
-#         temp = np.load(trial_filepaths[indexes[i]])
-#         out[i] = temp[channel, i]
-#         lock.release()
-#         time.sleep(delay)
-    
-#     return out
+def load_data(filepaths):
+    return np.array([np.load(file) for file in filepaths])
 
+def fetch_data(loaded_data, unique_indices, masks):
+    resample = np.zeros(masks[0].shape) 
+    for i in range(unique_indices.shape[0]):
+        resample[masks[i]] = loaded_data[unique_indices[i]][masks[i]]
+    return resample
 
-# def make_jobs_bootstrap(n_samples, channels, trial_filepaths, n_timepoints):
-#     trial_indexes = tuple(range(len(trial_filepaths)))
-#     time_idx = list(range(n_timepoints)) # placeholder
+def get_jobs_bootstrap(indices: np.ndarray):
+    """
+    Args:
+        indices: A 2D NumPy array of shape (n_channels, n_timepoints)
+                 containing integer file indices.
 
-#     for _ in range(n_samples):
-#         for ch in channels:
-#             indexs = np.random.choice(trial_indexes,size=trial_indexes.size, replace=True)
-#             yield (trial_filepaths, n_timepoints, time_idx, indexs, ch)
+    Returns:
+        A tuple containing:
+        - unique_indices (np.ndarray): A 1D array of the unique file indices
+                                       found, sorted.
+        - masks (np.ndarray): A 3D boolean array of shape
+                              (n_unique, n_channels, n_timepoints).
+                              masks[i] is the boolean mask corresponding to
+                              unique_indices[i].
+    """
+    unique_indices = np.unique(indices)
+    masks = (unique_indices[:, None, None] == indices)
+    return unique_indices, masks
 
-def fetch_data(trial_filepaths, jobs, shape, channels, time_range):
-    out = np.zeros(shape)
-    for job in jobs:
-        temp = np.load(trial_filepaths[job[0]])[channels, time_range[0]:time_range[1]+1]
-    
-        for idx in job[1:]:
-            out[idx[0],idx[1]] = temp[idx[0],idx[1]]
-
-    return out 
-
-def get_jobs(file_idxs, indices):
+def bootsrap_data_generator(n_samples, time_range, n_timepoints, channels, n_channels, trial_filepaths, file_idx):
     """
     """
-    return (
-        (i, *vals)
-        for i in file_idxs
-        if (vals := np.argwhere(indices==i)).size > 0
-    )
-
-
-def bootsrap_data_generator(n_samples, time_range, n_timepoints, channels, n_channels, trial_filepaths, file_idxs):
-    """
-    """
+    n_files = len(trial_filepaths)
     
     for _ in range(n_samples):
-        indices = choice(file_idxs, size=(n_channels, n_timepoints), replace=True)
-        # print(indices) # test runs only 
+        indices = choice(file_idx, size=(n_channels, n_timepoints), replace=True)
+        print(indices) # test runs only 
 
-        jobs = get_jobs(file_idxs, indices)
-        yield fetch_data(trial_filepaths, jobs, indices.shape, channels, time_range)
+        jobs = get_jobs_bootstrap(file_idx, indices)
+        # print(list(jobs))
+        yield load_data(trial_filepaths, jobs, indices.shape, channels, time_range)
         # then go to files in seperate func 
-
-def generator(worker, job_list): 
-    for job in job_list:
-        
-        yield worker(*job)
-
-def foo(x,y):
-    return x
 
 if __name__ == "__main__":
     import os
+    import shutil
     # Test config on simulated data
     # Test is valid if bootstrap_data_generator returns array == indicies array printed with test=True
-    
-    time_range = [0,100]
+    test_trial_n = 11
+    n_samples = 1
+    time_range = [0,15]
+
     n_timepoints = time_range[1]-time_range[0]
     if n_timepoints<1:
         raise ValueError(f"Must get at least 1 timepoint, got {n_timepoints}")
     
-    channels = list(range(30))
+    channels = list(range(5))
     n_channels = len(channels)
-    test_dir = Path(os.getcwd())/"test_dir"
+    test_dir = Path(__file__).parent / "test_dir"
+
     os.makedirs(test_dir, exist_ok=True)
-    test_n = 5
-    for i in range(test_n):
+    for i in range(test_trial_n):
         temp = np.ones((n_channels,n_timepoints))*i
+        # print(temp)
         np.save(test_dir / f"{i}.npy", temp)
 
-    trial_filepaths = list((test_dir).rglob("*.npy"))
-
-    n_samples = 1
-
+    trial_filepaths = list(test_dir.rglob("*.npy"))
+    trial_filepaths = sorted(trial_filepaths, key=lambda f: int(Path(f).stem))
+    file_idx = list(range(len(trial_filepaths)))
+    print(file_idx)
+    print([x.stem for x in trial_filepaths])
+    
     gen = bootsrap_data_generator(
         n_samples=n_samples, 
         time_range=time_range,
         n_timepoints=n_timepoints, 
         channels=channels, 
+        n_channels=len(channels),
         trial_filepaths=trial_filepaths,
-        test_run=True)
+        file_idx = file_idx
+
+        )
     
     print("Starting performance benchmark...")
     t1 = time.time()
     total_bytes_processed = 0
+    temp = []
     for x in gen:
+        temp.append(x)
         print(x)
         total_bytes_processed += x.nbytes
 
@@ -138,3 +127,4 @@ if __name__ == "__main__":
     print(f"| {'Processing Rate:':<30} {rate_mbs:.2f} MB/s{'':<{width-41}} |")
     print("#" * width + "\n")
 
+   

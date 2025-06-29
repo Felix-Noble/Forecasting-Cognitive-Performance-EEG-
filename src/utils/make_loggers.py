@@ -1,7 +1,9 @@
 #set_up_loggers.py
-import logging, os, sys
+import logging
+import os
+import sys
 
-def setup_logger(name=None, level_console=logging.DEBUG, level_file=logging.ERROR):
+def make_logger(name=None, level_console=logging.DEBUG, level_file=logging.ERROR):
     logger = logging.getLogger(name)
     logger.setLevel(level_console)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')

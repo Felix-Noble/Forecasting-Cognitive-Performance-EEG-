@@ -3,13 +3,11 @@ import mne
 import mne_bids
 import mne_bids.read
 import numpy as np
-from config import get_paths, get_settings, get_settings_stage
+from src.utils.config_loader import get_paths, get_settings, get_settings_epoch
 from pathlib import Path
 import pandas as pd
-from mne_bids import (
-    BIDSPath,
-    find_matching_paths,
-    )
+
+from mne_bids import find_matching_paths
 
 mne.set_log_level("CRITICAL")
 
@@ -17,7 +15,7 @@ def main(FolderName):
     errors = []
     paths = get_paths()
     settings = get_settings()
-    settings_stage = get_settings_stage()
+    settings_stage = get_settings_epoch()
     staging_root = Path(paths["staging_dir"]) / FolderName
     load_path = Path(paths["derivatives_dir"]) / "ICA"
     bids_paths = find_matching_paths(load_path, datatypes=settings["datatypes"], extensions=settings["extensions"])
