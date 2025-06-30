@@ -12,6 +12,7 @@ from tabulate import tabulate
 from numpy.random import choice
 import numba
 import warnings
+import logging
 from sklearn.exceptions import UndefinedMetricWarning
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 
@@ -20,29 +21,29 @@ warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 #         file_buffer = filepaths.iloc[(i*buffer_size):(i+1)*buffer_size]
 #         yield file_buffer.apply(np.load)
 
-def _get_bootstrap_job(indices: np.ndarray):
-    """
-    Args:
-        indices: A 2D NumPy array of shape (n_channels, n_timepoints)
-                 containing integer file indices.
+# def _get_bootstrap_job(indices: np.ndarray):
+#     """
+#     Args:
+#         indices: A 2D NumPy array of shape (n_channels, n_timepoints)
+#                  containing integer file indices.
 
-    Returns:
-        A tuple containing:
-        - included_filepaths (np.ndarray): A 1D array of the unique file indices
-                                       found
-        - masks (np.ndarray): A 3D boolean array of shape
-                              (n_unique, n_channels, n_timepoints).
-                              masks[i] is the boolean mask corresponding to
-                              unique_indices[i].
-    """
+#     Returns:
+#         A tuple containing:
+#         - included_filepaths (np.ndarray): A 1D array of the unique file indices
+#                                        found
+#         - masks (np.ndarray): A 3D boolean array of shape
+#                               (n_unique, n_channels, n_timepoints).
+#                               masks[i] is the boolean mask corresponding to
+#                               unique_indices[i].
+#     """
     
-    filepath_axis = np.full((filepaths.shape[0],), -1)
-    included_filepaths = np.unique(indices)
+#     filepath_axis = np.full((filepaths.shape[0],), -1)
+#     included_filepaths = np.unique(indices)
    
-    filepath_axis[included_filepaths] = included_filepaths # remove filepaths not selected by np.choice
-    masks = (filepath_axis[:, None, None] == indices)
+#     filepath_axis[included_filepaths] = included_filepaths # remove filepaths not selected by np.choice
+#     masks = (filepath_axis[:, None, None] == indices)
 
-    return masks
+#     return masks
 
 @numba.jit(nopython=True)
 def _load_and_fill_resamples(resamples: np.ndarray, loaded_data: np.ndarray, masks):
@@ -130,6 +131,48 @@ def _bootstrap_worker(file_buffer_size, compute_buffer_size):
             
     return _calculate_hurst_for_resample(resamples_buffer)
 
+def _to_mb_str(b):
+    return f"{b / (1024*1024):,.2f} MB"
+
+def _log_progress_table(batch_num, resamples_done, n_samples_total, n_workers, file_buffer_size, compute_buffer_size, file_mem_size, compute_mem_chunk_size):
+    """Generates and logs a formatted table of the current batch progress."""
+    
+    # Helper to format bytes into MB
+
+    # --- Calculations for the table ---
+    samples_this_batch = compute_buffer_size * n_workers
+    progress_percent = (resamples_done / n_samples_total) * 100
+    
+    # Memory allocation calculations
+    total_data_alloc = file_buffer_size * file_mem_size
+    total_compute_alloc = compute_buffer_size * compute_mem_chunk_size
+    per_worker_compute_alloc = total_compute_alloc / n_workers
+    
+    # System memory
+    memory = psutil.virtual_memory()
+    
+    # --- Table Structure ---
+    # Section for overall progress
+    progress_data = [
+        ["Batch Number", f"{batch_num}"],
+        ["Overall Progress", f"{resamples_done:,} / {n_samples_total:,} ({progress_percent:.2f}%)"],
+        ["Samples This Batch", f"{samples_this_batch:,} ({compute_buffer_size:,} per worker)"]
+    ]
+
+    # Section for memory usage
+    memory_data = [
+        ["Total System Available", _to_mb_str(memory.available)],
+        ["Data Buffer Allocation", f"{_to_mb_str(total_data_alloc)} ({file_buffer_size} files)"],
+        ["Compute Buffer Allocation", f"{_to_mb_str(total_compute_alloc)} (Total for {n_workers} workers)"],
+        ["Per-Worker Compute Alloc", _to_mb_str(per_worker_compute_alloc)]
+    ]
+    
+    # --- Generate and return the table string ---
+    progress_table = tabulate(progress_data, tablefmt="fancy_grid", headers=["Metric", "Value"])
+    memory_table = tabulate(memory_data, tablefmt="fancy_grid", headers=["Memory", "Size"])
+    
+    return f"Starting Batch {batch_num}\n{progress_table}\n{memory_table}"
+
 def run_bootstrap_for_condition(worker_func, 
                                 result_shape: tuple, 
                                 trial_filepaths: pd.Series,
@@ -145,6 +188,7 @@ def run_bootstrap_for_condition(worker_func,
     if trial_filepaths.shape[0] < 1:
         logger.error("No trial files found for condition. Skipping.")
         return
+    print(boot_settings)
     n_timepoints = boot_settings["time_range_ms"][1] - boot_settings["time_range_ms"][0]
     if n_timepoints < 1:
         raise ValueError(f"Time range (ms) specified poorly (n_timepoints = {n_timepoints}), check config.toml file. Current range = {boot_settings['time_range_ms'][0]} to {boot_settings['time_range_ms'][1]}")
@@ -183,7 +227,7 @@ def run_bootstrap_for_condition(worker_func,
             memory = psutil.virtual_memory()
             if memory.available < min_mem_chunk_size:
                 raise MemoryError("Insufficient memory available for processing, try reducing n_workers (config.toml)")
-            logger.info(f"Starting Batch {batch} -- {resamples_done}/{n_samples_total} samples done")
+            # logger.info(f"Starting Batch {batch} -- {resamples_done}/{n_samples_total} samples done")
 
             available_data_chunks = (memory.available - compute_mem_chunk_size - process_buffer) // file_mem_size
             if available_data_chunks >= n_files:
@@ -193,72 +237,30 @@ def run_bootstrap_for_condition(worker_func,
 
             compute_buffer_size = min(n_samples_total - resamples_done, (memory.available - process_buffer - (file_buffer_size * result_mem_size)) // compute_mem_chunk_size)
             # logger.info(f"\n{tabulate([samples_per_worker], [f'Worker {n}' for n in range(1,n_workers+1)], tablefmt='grid')}")
-            # TODO change this output to a table
-            logger.info(f"Data chunks: {file_buffer_size} | alloc={(file_buffer_size * file_mem_size)/(1024*1024)}MB || Compute chunks: {compute_buffer_size} | alloc={(compute_buffer_size * compute_mem_chunk_size)/(1024*1024)}MB || Total available: {(memory.available)/(1024*1024)}MB")
+            # Log progress in talbe
+            if logger.isEnabledFor(logging.INFO):
+                logger.info(_log_progress_table(batch, 
+                                                resamples_done, 
+                                                n_samples_total, 
+                                                n_workers, 
+                                                file_buffer_size, 
+                                                compute_buffer_size, 
+                                                file_mem_size, 
+                                                compute_mem_chunk_size))
+            
+            # logger.info(f"Data chunks: {file_buffer_size} | alloc={(file_buffer_size * file_mem_size)/(1024*1024)}MB || Compute chunks: {compute_buffer_size} | alloc={(compute_buffer_size * compute_mem_chunk_size)/(1024*1024)}MB || Total available: {(memory.available)/(1024*1024)}MB")
             results = pool.starmap(_bootstrap_worker, ((file_buffer_size, compute_buffer_size) for _ in range(n_workers)))
-            print(len(results))
+            # print(len(results))
             results = np.stack(results, axis=0)
-            print(results.shape)
+            # print(results.shape)
             results = results.squeeze()
-            print(results.shape)
+            # print(results.shape)
 
             np.save(output_path / f"batch{batch}.npy", results)
 
             resamples_done += (results.shape[0] * results.shape[1]) # 
             batch += 1
-    # sys.exit(0)
-    # _init_bootstrap_worker(f_shape=result_shape,
-    #                        resam_shape=resample_shape,
-    #                        resul_shape=result_shape,
-    #                        ch_nums=boot_settings["channels"],
-    #                        t_range_ms=boot_settings["time_range_ms"],
-    #                        w_func=worker_func,
-    #                        f_paths=trial_filepaths,
-    #                        data_type=np.float64,
-    #                        )
-    
-    # results = _bootstrap_worker(file_buffer_size, 
-    #                   compute_buffer_size)
-    
-
-    # print(results)
-    # sys.exit(0)
-    # # load files until file buffer 
-    #     # need to pass 2 values to generators (one for files loaded and one for compute chunks)
-
-    # # process resamples until available_compute_chunks
-
-    # # process results until available_compute_chunks
-
-    # # save, clear 
-    
-    # store_buffer = 2 * n_workers * sample_mem_size # MINIMUM memory allocation for storing results
-
-    
-    # data_buffer = None # memory allocation for loading data
-    # compute_buffer = None # memory allocation for storing resamples
-
-    # with multiprocessing.Pool(processes=n_workers, initializer=_init_bootstrap_worker, initargs=(worker_func, generator_args)) as pool:
-    #     while resamples_done < n_samples_total:
-    #         logger.info(f"Starting Batch {batch} -- {resamples_done}/{n_samples_total} samples done")
-    #         memory = psutil.virtual_memory()
-    #         available_mem_chunks = min(n_samples_total, (memory.available // sample_mem_size) - 200) # safety net of 200
-            
-    #         base, remainder = divmod(available_mem_chunks, n_workers)
-    #         samples_per_worker = [base + 1 if i < remainder else base for i in range(n_workers)]
-    #         print(available_mem_chunks)
-    #         print(samples_per_worker)
-            
-    #         logger.info(f"\n{tabulate([samples_per_worker], [f'Worker {n}' for n in range(1,n_workers+1)], tablefmt='grid')}")
-
-    #         results = pool.map(_bootstrap_worker, samples_per_worker)
-    #         # results = pool.starmap(_bootstrap_worker, [(n, worker_func, generator_args) for n in samples_per_worker])
-
-    #         print(results)
-    #         break
-    #     # update counters
-    #     batch += 1
-
+   
 def run_per_level_hurst_bootsrap_analysis():
     
     paths = get_paths()
@@ -290,118 +292,3 @@ def run_per_level_hurst_bootsrap_analysis():
                 
                 logger.error(e)
             
-'''
-"""
-def hurst_rolling_multichannel(data, window_size=1000):
-    """
-    Calculates the Hurst exponent for each channel across a rolling window in a multi-channel time series.
-
-    Args:
-        data (np.ndarray): A 2D NumPy array where each row is a time series channel.
-
-    Returns:
-        2D array containing rolling window hurst exponents for each channel.
-    """
-    rolling_exponents= []
-    temp = []
-    for channel in range(data.shape[0]):
-        for i in range((data.shape[1]-window_size)-1):
-            temp.append(nolds.hurst_rs(data[channel, (i):(i+window_size)]))
-
-        rolling_exponents.append(temp)
-        temp.clear()
-    return rolling_exponents
-
-def hurst_rolling_window_worker_func(hurst_func, window_size, *data_gen_args):
-
-    generator = bootsrap_data_generator(*data_gen_args)
-    values = []
-
-    for data in generator:
-        
-        values.append(hurst_func(data, window_size))
-
-    return values 
-
-def hurst_worker_func(hurst_func, *data_gen_args):
-
-    generator = bootsrap_data_generator(*data_gen_args)
-    values = []
-
-    for data in generator:
-        values.append(hurst_func(data))
-
-    return values 
-    
-def preload_save_hurst_worker(export_fname, *gen_args):
-    resamples = tuple(bootsrap_data_generator(*gen_args))
-
-    out = np.asarray(tuple(hurst_multichannel(data) for data in resamples))
-    
-    np.save(export_fname, out)
-    return out.shape[0]
-'''
-
-# def main(input_dir=None, output_dir=None, dtype=np.float64):
-
-#     paths = get_paths()
-#     if output_dir is None:
-#         raise ValueError("Must specify output dir")
-    
-#     if input_dir is None:
-#         input_dir = paths["staging_dir"]
-#     trial_filepaths = list(Path(input_dir).rglob("*.npy"))
-#     filepath_idxs = list(range(len(trial_filepaths)))
-
-#     boot_settings = get_settings_bootstrap()
-
-#     channels = boot_settings["channels"]
-#     n_channels = len(channels)
-
-#     time_range = boot_settings["time_range"]
-
-#     n_timepoints = time_range[1] - time_range[0]
-#     if n_timepoints < 1:
-#         raise ValueError(f"Must get at least 1 timepoint, got {n_timepoints}")
-    
-#     sample_mem_size = dtype().itemsize * (n_channels*n_timepoints)
-    
-#     N_samples = boot_settings["n_samples"]
-#     N_workers = boot_settings["n_workers"]
-#     n_samples_per_worker = N_samples // N_workers
-
-#     # Preallocate variables to avoid memory leaks
-
-#     worker_chunk_size = 0
-#     samples_done = 0
-#     available_memory_chunks = 0
-
-#     batch = 1
-#     done = 0
-
-#     while samples_done < N_samples:
-#         logger.info(f"Starting Batch {batch} -- {samples_done}/{N_samples} samples done")
-#         memory = psutil.virtual_memory()
-#         available_memory_chunks = (memory.available // sample_mem_size) - 200 # safety net of 50
-#         if available_memory_chunks > (N_samples - samples_done):
-#             available_memory_chunks = N_samples - samples_done
-#             samples_done = N_samples
-        
-#         worker_chunk_size = available_memory_chunks // N_workers
-#         logger.info(f"\t{N_workers} workers processing {worker_chunk_size} samples each")
-        
-#         with multiprocessing.Pool(processes=N_workers) as pool:
-#             results = pool.starmap(preload_save_hurst_worker, ((f"{output_dir}-batch{batch}-worker{worker_i}", worker_chunk_size, time_range, n_timepoints, channels, n_channels, trial_filepaths, filepath_idxs) for worker_i in range(N_workers)))
-        
-#         done = sum(results)
-#         samples_done += done
-#         batch += 1
-
-#         logger.info(f"Completed {done} resamples")
-
-#         del results
-
-#     return True
-
-
-
