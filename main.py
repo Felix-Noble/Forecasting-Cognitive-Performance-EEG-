@@ -8,9 +8,12 @@ import os
 from pathlib import Path
 
 func_dict = {"egi_to_bids" : egi_to_bids,
+             
              "preprocess" : preprocess,
+
              "create_epochs": create_epochs,
              "epoch": create_epochs,
+             
              "per level hurst bootstrap": run_per_level_hurst_bootsrap_analysis,
              "hurst boot": run_per_level_hurst_bootsrap_analysis}
 
