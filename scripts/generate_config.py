@@ -1,17 +1,16 @@
 #generate_config.py
 import toml
-from config import load_config
+from pathlib import Path
+# from config import load_config
 
 if __name__ == "__main__":
     config_data = {
-    '__init__': {'init': True}, 
-     
      'paths': {
-                'root_dir': 'E:/Dropbox/4. Codebase/APTIMA/data', 
-                'derivatives_dir': 'E:/Dropbox/4. Codebase/APTIMA/derivatives', 
-                'staging_dir': 'E:/Dropbox/4. Codebase/APTIMA/staging', 
-                'input_dir': 'D:/data/APTIMA dataset', 
-                'output_dir': 'E:/Dropbox/4. Codebase/APTIMA/data'}, 
+                'derivatives_dir': 'derivatives', 
+                'staging_dir': 'staging', 
+                'raw_egi_dir': 'Path/to/data', 
+                'raw_bids_dir': 'data/raw',
+                'config_dir': 'config'}, 
                
     'settings': {
                 'datatypes': ['eeg'], 
@@ -28,7 +27,8 @@ if __name__ == "__main__":
 
     'settings_stage': {
         'event_prefix': 'F', 
-        'baseline_correct_window': [-0.2, -0.1]}, 
+        'baseline_correct_window': [-0.2, -0.1],
+        'channels': list(range(125))}, 
 
     'settings_bootstrap': {
             'n_samples': 8, 
@@ -40,8 +40,7 @@ if __name__ == "__main__":
             
     'cut_settings': {
         't_minus_end': 3600}
-            
             }
     
-    with open('config.toml', 'w') as f:
+    with open(Path(config_data["paths"]["config_dir"])/ 'config.toml', 'w') as f:
         toml.dump(config_data, f)
