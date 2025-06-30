@@ -33,8 +33,8 @@ def config_generator():
         "time_max_s": 10}, 
 
     'bootstrap': {
-            'n_samples': 1000, 
-            'n_workers': 8, 
+            'n_samples': 30, 
+            'n_workers': 2, 
             'channels': list(range(125)), # include channels 1-125 for bootsrapping
             'time_range_ms':[0, 10100] # time range in ms where 0 is start of npy file, not start of epoch
             }, 
