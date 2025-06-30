@@ -47,16 +47,23 @@ warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 
 @numba.jit(nopython=True)
 def _load_and_fill_resamples(resamples: np.ndarray, loaded_data: np.ndarray, masks):
-    """Edits resample_buffer ndarray in place, adding in masked data as available"""
+    """
+    Edits resample_buffer ndarray in place, adding in masked values from loaded_data
+    
+    Expects masks to be singular for each loaded_data entry, 
+        if mulitple jobs are made for one data_index merge them prior to calling this
+    
+    """
     channels, timepoints = masks[0,:,:].shape
     # print(channels, timepoints)
-    for (data_idx) in range(masks.shape[0]):
-        # print(masks[data_idx,:,:].shape)
-        # print(resamples[data_idx])
-        for chan in range(channels):
-            for time in range(timepoints):
-                if masks[data_idx, chan, time]:
-                    resamples[data_idx,chan, time] = loaded_data[data_idx, chan, chan]
+    for resample_idx in range(resamples.shape[0]):
+        for (data_idx) in range(masks.shape[0]):
+            # print(masks[data_idx,:,:].shape)
+            # print(resamples[data_idx])
+            for chan in range(channels):
+                for time in range(timepoints):
+                    if masks[data_idx, chan, time]:
+                        resamples[resample_idx, chan, time] = loaded_data[data_idx, chan, time]
         # print(resamples[data_idx])
 
 def _calculate_hurst_for_resample(resampled_data):
