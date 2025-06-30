@@ -10,7 +10,7 @@ This project is an EEG analysis pipeline designed for the APTIMA project. It pro
 
 The project is organized into a `src` directory containing the core pipeline modules, with top-level files for configuration and execution.
 
-.
+~~~
 ├── main.py                 # Main entry point for running the analysis pipeline.
 ├── config.toml             # Configuration file for paths, settings, and pipeline parameters.
 ├── generate_config.py      # Generates a default config.toml file.
@@ -30,7 +30,7 @@ The project is organized into a `src` directory containing the core pipeline mod
 ├── init.py
 ├── config_loader.py    # Helper to find project root and load config.toml.
 └── make_loggers.py     # Helper to create console and file loggers.
-.
+~~~
 
 ## 3. Dependencies
 
