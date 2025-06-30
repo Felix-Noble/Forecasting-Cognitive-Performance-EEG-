@@ -13,17 +13,16 @@ The project is organized into a `src` directory containing the core pipeline mod
 ~~~
 ├── main.py                 # Main entry point for running the analysis pipeline.
 ├── config.toml             # Configuration file for paths, settings, and pipeline parameters.
-├── generate_config.py      # Generates a default config.toml file.
 ├── pyproject.toml          # Project metadata and build system configuration.
 ├── requirements.txt        # Lists the Python dependencies for the project.
+├── init/
+├── └── generate_config.py      # Generates a default config.toml file.
 └── src/
-├── init.py
 ├── analysis/
-│   ├── init.py
-│   └── bootstrap.py        # Manages and runs the bootstrapping analysis.
+│   └── bootstrap.py        # Bootstrap data from staged .npy files.
 ├── data_preparation/
 │   ├── init.py
-│   ├── create_epochs.py    # Creates epochs from preprocessed data.
+│   ├── create_epochs.py    # Creates epochs and stages them for bootstrap module.
 │   ├── egi_to_bids.py      # Converts raw EGI data to BIDS format.
 │   └── preprocess.py       # Preprocesses BIDS data (filtering, ICA).
 └── utils/
@@ -36,26 +35,24 @@ The project is organized into a `src` directory containing the core pipeline mod
 
 The project requires several Python packages, including `mne`, `mne-bids`, `numpy`, `pandas`, `nolds`, and `toml`. All dependencies can be installed using:
 
-```bash
+~~~
 pip install -r requirements.txt
-'''
-4. Configuration (config.toml)
+~~~
+
+## 4. Configuration (config.toml)
 The pipeline is configured via config.toml. The src/utils/config_loader.py module robustly finds and loads this file by locating the project's root directory (marked by pyproject.toml). It provides functions to access different sections of the configuration, ensuring that paths are correctly resolved relative to the project root.
 
 If config.toml is not found, main.py will automatically generate a default version.
 
-5. Executing the Pipeline with main.py
+## 5. Executing the Pipeline with main.py
 The main.py script serves as the primary entry point and acts as a dispatcher for running different stages of the analysis. It maps command-line arguments to the corresponding pipeline functions.
 
-Operations
+## Operations
 Initialization: Upon running, it ensures a config.toml file exists, creating one if necessary.
 
-Argument Mapping: It uses a dictionary to map recognized string commands to their respective functions from the src modules.
+Execution: Currently, give "CLI" style args to main.py main() function. CLI Interface comign in 0.2.0
 
-Execution: It iterates through the provided command-line arguments and executes the corresponding functions in order.
-
-Available Commands
-You can run any of the following pipeline steps by passing their name as an argument to main.py:
+Available Commands (args):
 
 egi_to_bids: Converts raw EGI data to BIDS format.
 
