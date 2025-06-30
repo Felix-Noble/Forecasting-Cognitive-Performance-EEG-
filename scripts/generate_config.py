@@ -16,30 +16,30 @@ if __name__ == "__main__":
                 'datatypes': ['eeg'], 
                 'extensions': ['.vhdr']}, 
 
-    'settings_prep': {
+    'pipeline':{
+        "preprocessing": {
                 'notch_filter': [60], 
                 'low_filter': 1, 
                 'high_filter': 50, 
                 'filter_method': 'fir', 
                 'reference': 'average', 
                 'ica_n_components': 15, 
-                'EOG_CHANNEL': 'E126'}, 
+                'EOG_CHANNEL': 'E126',
+                't_minus_end': 3600}, 
 
-    'settings_stage': {
+    'epoch': {
         'event_prefix': 'F', 
         'baseline_correct_window': [-0.2, -0.1],
-        'channels': list(range(125))}, 
+        'channels': list(range(125)),
+        "time_max_s": 10}, 
 
-    'settings_bootstrap': {
-            'n_samples': 8, 
-            'n_workers': 7, 
-            "batch_size":7,
+    'bootstrap': {
+            'n_samples': 1000, 
+            'n_workers': 8, 
             'channels': list(range(125)), # include channels 1-125 for bootsrapping
-            'time_range':[0, 10100] # time range in ms where 0 is start of npy file, not start of epoch
+            'time_range_ms':[0, 10100] # time range in ms where 0 is start of npy file, not start of epoch
             }, 
-            
-    'cut_settings': {
-        't_minus_end': 3600}
+            }
             }
     
     with open(Path(config_data["paths"]["config_dir"])/ 'config.toml', 'w') as f:
