@@ -4,7 +4,6 @@ from src.utils.config_loader import get_paths, get_settings_bootstrap
 import multiprocessing
 from pathlib import Path
 import os
-import sys
 import numpy as np
 import pandas as pd
 import nolds

@@ -22,6 +22,8 @@ def main(FolderName):
     
     baseline_window = settings_stage["baseline_correct_window"]
     event_prefix = settings_stage["event_prefix"]
+    time_max_s = settings_stage["time_max_s"]
+    channels = settings_stage["channels"]
 
     for path in bids_paths:
         try: 
@@ -52,11 +54,12 @@ def main(FolderName):
             event_name_id = {v:k for k,v in event_id.items()}
 
             epochs = mne.Epochs(
-                raw,
-                events,
+                raw=raw,
+                events=events,
                 event_id=None,
                 tmin=baseline_window[0],
-                tmax=10,
+                tmax=time_max_s,
+                picks=channels,
                 baseline=baseline_window,
                 preload=True,
                 verbose=False
