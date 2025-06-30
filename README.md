@@ -40,14 +40,14 @@ pip install -r requirements.txt
 ~~~
 
 ## 4. Configuration (config.toml)
-The pipeline is configured via config.toml. The src/utils/config_loader.py module robustly finds and loads this file by locating the project's root directory (marked by pyproject.toml). It provides functions to access different sections of the configuration, ensuring that paths are correctly resolved relative to the project root.
+The pipeline is configured via config.toml. The src/utils/config_loader.py module robustly finds and loads this file by locating the project's root directory (marked by pyproject.toml).
 
 If config.toml is not found, main.py will automatically generate a default version.
 
 ## 5. Executing the Pipeline with main.py
 The main.py script serves as the primary entry point and acts as a dispatcher for running different stages of the analysis. It maps command-line arguments to the corresponding pipeline functions.
 
-## Operations
+## 6. Operations
 Initialization: Upon running, it ensures a config.toml file exists, creating one if necessary.
 
 Execution: Currently, give "CLI" style args to main.py main() function. CLI Interface comign in 0.2.0
