@@ -6,7 +6,7 @@ from mne_bids import BIDSPath, write_raw_bids
 from pathlib import Path
 mne.set_log_level("WARNING")
 
-def _process():
+def _convert():
     """Project specific function to move egi dataset to bids format"""
     paths = get_paths()
     files = Path(paths["input_dir"]).rglob("*.mff")
@@ -56,4 +56,4 @@ def _process():
             logger.error(f"sub-{subject} {e}")
 
 if __name__ == "__main__":
-    _process()
+    _convert()
