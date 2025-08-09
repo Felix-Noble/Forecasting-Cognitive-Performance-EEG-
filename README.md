@@ -1,5 +1,3 @@
-Markdown
-
 # APTIMA EEG Analysis Pipeline
 
 ## 1. Project Overview
@@ -61,5 +59,6 @@ preprocess: Applies filtering and ICA to the BIDS data.
 create_epochs or epoch: Segments the preprocessed data into epochs.
 
 per level hurst bootstrap or hurst boot: Runs the final Hurst exponent bootstrap analysis.
+
 
 help or h: Displays the list of available commands.
